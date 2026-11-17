@@ -13,7 +13,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
-from models import Ingredient
+from models import Ingredient, measure_of
 from report import build_report
 from store import Store, StoreException, default_data_root
 
@@ -95,6 +95,21 @@ def _money(value: Any, *, label: str) -> int:
     raise StoreException(f"{label} raqam bo'lsin")
 
 
+def _coord(value: Any, *, min_v: float, max_v: float, label: str) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        number = float(value)
+    else:
+        try:
+            number = float(str(value))
+        except ValueError as exc:
+            raise StoreException(f"{label} noto'g'ri") from exc
+    if number < min_v or number > max_v:
+        raise StoreException(f"{label} noto'g'ri")
+    return number
+
+
 def _ingredients(raw: Any) -> list[Ingredient]:
     if raw is None:
         return []
@@ -107,10 +122,17 @@ def _ingredients(raw: Any) -> list[Ingredient]:
         if not isinstance(entry, dict):
             raise StoreException("Masalliq noto'g'ri")
         name = str(entry.get("name") or "").strip()
-        amount = str(entry.get("amount") or "").strip()
         if not name:
             continue
-        items.append(Ingredient(name=name, amount=amount))
+        price = 0 if entry.get("price") is None else _money(entry.get("price"), label="Masalliq narxi")
+        qty, unit = measure_of(
+            amount=str(entry.get("amount") or "").strip(),
+            quantity=entry.get("quantity"),
+            unit=entry.get("unit"),
+        )
+        if qty < 0 or qty > 100000:
+            raise StoreException("Miqdor noto'g'ri")
+        items.append(Ingredient(name=name, quantity=qty, unit=unit, price=price))
     return items
 
 
@@ -266,6 +288,10 @@ async def _save_product(request: Request, product_id: int | None = None):
     if cost > 100_000_000 or markup > 100_000_000:
         return _error(400, "Summa juda katta")
     ingredients = _ingredients(body.get("ingredients"))
+    priced = sum(item.price for item in ingredients)
+    stored_cost = priced if priced > 0 else cost
+    if stored_cost > 100_000_000:
+        return _error(400, "Summa juda katta")
     image: str | None = None
     keep_image = True
     if "imageBase64" in body:
@@ -278,7 +304,7 @@ async def _save_product(request: Request, product_id: int | None = None):
         catalog_id=catalog_id,
         name=name,
         ingredients=ingredients,
-        cost=cost,
+        cost=stored_cost,
         markup=markup,
         image=image,
         keep_image=keep_image and product_id is not None,
@@ -303,12 +329,18 @@ async def place_order(request: Request):
         return _error(400, "Buyurtma turi noto'g'ri")
     phone = str(body.get("phone") or "").strip()
     address = str(body.get("address") or "").strip()
+    latitude: float | None = None
+    longitude: float | None = None
     if channel == "yetkazish":
         digits = re.sub(r"\D", "", phone)
         if len(digits) < 9:
             return _error(400, "Yetkazish uchun telefon kiriting")
         if len(address) < 5:
             return _error(400, "Yetkazish manzilini kiriting")
+        latitude = _coord(body.get("latitude"), min_v=-90, max_v=90, label="Kenglik")
+        longitude = _coord(body.get("longitude"), min_v=-180, max_v=180, label="Uzunlik")
+        if (latitude is None) != (longitude is None):
+            return _error(400, "Joylashuv noto'g'ri")
     raw_lines = body.get("items")
     if not isinstance(raw_lines, list) or not raw_lines:
         return _error(400, "Kamida bitta taom tanlang")
@@ -323,7 +355,14 @@ async def place_order(request: Request):
         if quantity < 1 or quantity > 99:
             return _error(400, "Soni 1 dan 99 gacha bo'lsin")
         lines.append((product_id, quantity))
-    order = await store.place_order(channel=channel, phone=phone, address=address, lines=lines)
+    order = await store.place_order(
+        channel=channel,
+        phone=phone,
+        address=address,
+        lines=lines,
+        latitude=latitude,
+        longitude=longitude,
+    )
     return _json(order.to_json(), status=201)
 
 

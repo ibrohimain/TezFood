@@ -1,21 +1,95 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
 
+def measure_of(
+    *,
+    amount: str = "",
+    quantity: Any = None,
+    unit: str | None = None,
+) -> tuple[float, str]:
+    if isinstance(quantity, (int, float)) and not isinstance(quantity, bool):
+        return float(quantity), "kg" if unit == "kg" else "g"
+    if isinstance(quantity, str):
+        parsed = _parse_float(quantity)
+        if parsed is not None:
+            return parsed, "kg" if unit == "kg" else "g"
+    lower = amount.lower()
+    has_kg = re.search(r"(^|[^a-z])kg\b", lower) is not None
+    has_gram = re.search(r"(^|[^a-z])g\b", lower) is not None
+    if not has_kg and not has_gram:
+        return 0.0, "g"
+    match = re.search(r"(\d+(?:[.,]\d+)?)", amount)
+    value = 0.0 if match is None else (_parse_float(match.group(1)) or 0.0)
+    return value, "kg" if has_kg else "g"
+
+
+def _parse_float(raw: str) -> float | None:
+    try:
+        return float(raw.strip().replace(",", "."))
+    except ValueError:
+        return None
+
+
+def as_double(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    return _parse_float(str(value))
+
+
 @dataclass
 class Ingredient:
     name: str
-    amount: str
+    quantity: float
+    unit: str
+    price: int
+
+    @property
+    def amount(self) -> str:
+        if self.quantity <= 0:
+            return ""
+        if self.quantity == round(self.quantity):
+            text = f"{int(round(self.quantity))}"
+        else:
+            text = f"{self.quantity:.2f}"
+        return f"{text} {self.unit}"
 
     def to_json(self) -> dict[str, Any]:
-        return {"name": self.name, "amount": self.amount}
+        return {
+            "name": self.name,
+            "quantity": self.quantity,
+            "unit": self.unit,
+            "price": self.price,
+            "amount": self.amount,
+        }
 
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> Ingredient:
-        return cls(name=str(data.get("name") or ""), amount=str(data.get("amount") or ""))
+        qty, unit = measure_of(
+            amount=str(data.get("amount") or ""),
+            quantity=data.get("quantity"),
+            unit=data.get("unit"),
+        )
+        raw_price = data.get("price")
+        if isinstance(raw_price, (int, float)) and not isinstance(raw_price, bool):
+            price = int(round(raw_price))
+        else:
+            try:
+                price = int(str(raw_price))
+            except (TypeError, ValueError):
+                price = 0
+        return cls(
+            name=str(data.get("name") or ""),
+            quantity=qty,
+            unit=unit,
+            price=price,
+        )
 
 
 @dataclass
@@ -49,6 +123,14 @@ class Product:
     @property
     def price(self) -> int:
         return self.cost + self.markup
+
+    @property
+    def ingredient_cost(self) -> int:
+        return sum(i.price for i in self.ingredients)
+
+    @property
+    def counted_cost(self) -> int:
+        return self.ingredient_cost if self.ingredient_cost > 0 else self.cost
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -125,6 +207,8 @@ class FoodOrder:
     phone: str
     address: str
     items: list[OrderItem] = field(default_factory=list)
+    latitude: float | None = None
+    longitude: float | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -135,6 +219,8 @@ class FoodOrder:
             "channel": self.channel,
             "phone": self.phone,
             "address": self.address,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
             "items": [i.to_json() for i in self.items],
         }
 
@@ -147,6 +233,8 @@ class FoodOrder:
             "channel": self.channel,
             "phone": self.phone,
             "address": self.address,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
             "items": [i.to_kassa_json() for i in self.items],
         }
 
@@ -161,5 +249,7 @@ class FoodOrder:
             channel=str(data.get("channel") or "zal"),
             phone=str(data.get("phone") or ""),
             address=str(data.get("address") or ""),
+            latitude=as_double(data.get("latitude")),
+            longitude=as_double(data.get("longitude")),
             items=[OrderItem.from_json(e) for e in raw],
         )

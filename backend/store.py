@@ -75,6 +75,9 @@ class Store:
             Catalog(id=self._id(), name="Ichimliklar", sort_order=3),
         ]
 
+        def ing(name: str, amount: str = "", price: int = 0) -> Ingredient:
+            return Ingredient.from_json({"name": name, "amount": amount, "price": price})
+
         def food(
             catalog_id: int,
             name: str,
@@ -97,11 +100,11 @@ class Store:
                 self.catalogs[0].id,
                 "Tovuqli lavash",
                 [
-                    Ingredient("Lavash xamiri", "1 dona"),
-                    Ingredient("Tovuq go'shti", "120 g"),
-                    Ingredient("Pomidor", "30 g"),
-                    Ingredient("Bodring", "30 g"),
-                    Ingredient("Sous", "20 g"),
+                    ing("Lavash xamiri"),
+                    ing("Tovuq go'shti", "120 g"),
+                    ing("Pomidor", "30 g"),
+                    ing("Bodring", "30 g"),
+                    ing("Sous", "20 g"),
                 ],
                 18000,
                 14000,
@@ -110,11 +113,11 @@ class Store:
                 self.catalogs[0].id,
                 "Go'shtli lavash",
                 [
-                    Ingredient("Lavash xamiri", "1 dona"),
-                    Ingredient("Mol go'shti", "130 g"),
-                    Ingredient("Piyoz", "20 g"),
-                    Ingredient("Pomidor", "30 g"),
-                    Ingredient("Sous", "20 g"),
+                    ing("Lavash xamiri"),
+                    ing("Mol go'shti", "130 g"),
+                    ing("Piyoz", "20 g"),
+                    ing("Pomidor", "30 g"),
+                    ing("Sous", "20 g"),
                 ],
                 22000,
                 16000,
@@ -123,11 +126,11 @@ class Store:
                 self.catalogs[1].id,
                 "Chizburger",
                 [
-                    Ingredient("Burger noni", "1 dona"),
-                    Ingredient("Kotlet", "100 g"),
-                    Ingredient("Sir", "20 g"),
-                    Ingredient("Salat bargi", "10 g"),
-                    Ingredient("Sous", "15 g"),
+                    ing("Burger noni"),
+                    ing("Kotlet", "100 g"),
+                    ing("Sir", "20 g"),
+                    ing("Salat bargi", "10 g"),
+                    ing("Sous", "15 g"),
                 ],
                 20000,
                 14000,
@@ -136,10 +139,10 @@ class Store:
                 self.catalogs[1].id,
                 "Tovuqli burger",
                 [
-                    Ingredient("Burger noni", "1 dona"),
-                    Ingredient("Tovuq kotlet", "110 g"),
-                    Ingredient("Salat bargi", "10 g"),
-                    Ingredient("Sous", "15 g"),
+                    ing("Burger noni"),
+                    ing("Tovuq kotlet", "110 g"),
+                    ing("Salat bargi", "10 g"),
+                    ing("Sous", "15 g"),
                 ],
                 17000,
                 13000,
@@ -148,10 +151,10 @@ class Store:
                 self.catalogs[2].id,
                 "Hot-dog",
                 [
-                    Ingredient("Hot-dog noni", "1 dona"),
-                    Ingredient("Sosiska", "1 dona"),
-                    Ingredient("Ketchup", "15 g"),
-                    Ingredient("Xantal", "5 g"),
+                    ing("Hot-dog noni"),
+                    ing("Sosiska"),
+                    ing("Ketchup", "15 g"),
+                    ing("Xantal", "5 g"),
                 ],
                 8000,
                 7000,
@@ -160,9 +163,9 @@ class Store:
                 self.catalogs[2].id,
                 "Kartoshka fri",
                 [
-                    Ingredient("Kartoshka", "150 g"),
-                    Ingredient("Yog'", "qovurish"),
-                    Ingredient("Tuz", "1 g"),
+                    ing("Kartoshka", "150 g"),
+                    ing("Yog'"),
+                    ing("Tuz", "1 g"),
                 ],
                 6000,
                 6000,
@@ -170,14 +173,14 @@ class Store:
             food(
                 self.catalogs[3].id,
                 "Cola 0.5",
-                [Ingredient("Gazlangan ichimlik", "0.5 l")],
+                [ing("Gazlangan ichimlik")],
                 4000,
                 4000,
             ),
             food(
                 self.catalogs[3].id,
                 "Mevali sok",
-                [Ingredient("Sok", "0.33 l")],
+                [ing("Sok")],
                 5000,
                 4000,
             ),
@@ -387,6 +390,8 @@ class Store:
         phone: str,
         address: str,
         lines: list[tuple[int, int]],
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> FoodOrder:
         async with self._lock:
             items: list[OrderItem] = []
@@ -400,7 +405,7 @@ class Store:
                         name=product.name,
                         quantity=quantity,
                         unit_price=product.price,
-                        unit_cost=product.cost,
+                        unit_cost=product.counted_cost,
                     )
                 )
             now = datetime.now()
@@ -412,6 +417,8 @@ class Store:
                 channel=channel,
                 phone=phone,
                 address=address,
+                latitude=latitude,
+                longitude=longitude,
                 items=items,
             )
             self.orders.append(order)
@@ -445,6 +452,8 @@ class Store:
                 channel=current.channel,
                 phone=current.phone,
                 address=current.address,
+                latitude=current.latitude,
+                longitude=current.longitude,
                 items=current.items,
             )
             self.orders[index] = next_order
