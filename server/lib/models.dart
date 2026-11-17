@@ -1,17 +1,65 @@
 class Ingredient {
-  Ingredient({required this.name, required this.amount});
+  Ingredient({
+    required this.name,
+    required this.quantity,
+    required this.unit,
+    required this.price,
+  });
 
   final String name;
-  final String amount;
+  final double quantity;
+  final String unit;
+  final int price;
 
-  Map<String, dynamic> toJson() => {'name': name, 'amount': amount};
+  String get amount {
+    if (quantity <= 0) return '';
+    final text = quantity == quantity.roundToDouble()
+        ? quantity.toStringAsFixed(0)
+        : quantity.toStringAsFixed(2);
+    return '$text $unit';
+  }
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'quantity': quantity,
+        'unit': unit,
+        'price': price,
+        'amount': amount,
+      };
 
   factory Ingredient.fromJson(Map<String, dynamic> json) {
+    final measured = measureOf(
+      amount: json['amount'] as String? ?? '',
+      quantity: json['quantity'],
+      unit: json['unit'] as String?,
+    );
+    final rawPrice = json['price'];
     return Ingredient(
       name: json['name'] as String? ?? '',
-      amount: json['amount'] as String? ?? '',
+      quantity: measured.$1,
+      unit: measured.$2,
+      price: rawPrice is num ? rawPrice.round() : int.tryParse('$rawPrice') ?? 0,
     );
   }
+}
+
+(double, String) measureOf({required String amount, Object? quantity, String? unit}) {
+  if (quantity is num) {
+    return (quantity.toDouble(), unit == 'kg' ? 'kg' : 'g');
+  }
+  if (quantity is String) {
+    final parsed = double.tryParse(quantity.trim().replaceAll(',', '.'));
+    if (parsed != null) {
+      return (parsed, unit == 'kg' ? 'kg' : 'g');
+    }
+  }
+  final lower = amount.toLowerCase();
+  final hasKg = RegExp(r'(^|[^a-z])kg\b').hasMatch(lower);
+  final hasGram = RegExp(r'(^|[^a-z])g\b').hasMatch(lower);
+  if (!hasKg && !hasGram) return (0, 'g');
+  final match = RegExp(r'(\d+(?:[.,]\d+)?)').firstMatch(amount);
+  final value = match == null ? 0.0 : double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
+  return (value, hasKg ? 'kg' : 'g');
 }
 
 class Catalog {
@@ -56,6 +104,11 @@ class Product {
   final int markup;
 
   int get price => cost + markup;
+
+  int get ingredientCost => ingredients.fold(0, (sum, item) => sum + item.price);
+
+  /// Masalliq narxi yozilgan bo'lsa xarajat shu yig'indi. Aks holda qo'lda kiritilgan xarajat.
+  int get countedCost => ingredientCost > 0 ? ingredientCost : cost;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -130,6 +183,8 @@ class FoodOrder {
     required this.channel,
     required this.phone,
     required this.address,
+    this.latitude,
+    this.longitude,
     required this.items,
   });
 
@@ -140,6 +195,8 @@ class FoodOrder {
   final String channel;
   final String phone;
   final String address;
+  final double? latitude;
+  final double? longitude;
   final List<OrderItem> items;
 
   Map<String, dynamic> toJson() => {
@@ -150,6 +207,8 @@ class FoodOrder {
         'channel': channel,
         'phone': phone,
         'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
         'items': items.map((e) => e.toJson()).toList(),
       };
 
@@ -162,6 +221,8 @@ class FoodOrder {
         'channel': channel,
         'phone': phone,
         'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
         'items': items
             .map((e) => {'name': e.name, 'quantity': e.quantity})
             .toList(),
@@ -177,9 +238,17 @@ class FoodOrder {
       channel: json['channel'] as String? ?? 'zal',
       phone: json['phone'] as String? ?? '',
       address: json['address'] as String? ?? '',
+      latitude: _asDouble(json['latitude']),
+      longitude: _asDouble(json['longitude']),
       items: raw
           .map((e) => OrderItem.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
   }
+}
+
+double? _asDouble(Object? value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse('$value');
 }

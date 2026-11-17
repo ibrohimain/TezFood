@@ -37,6 +37,27 @@ OrderItem item({
 }
 
 void main() {
+  test('eski masalliq yozuvi grammga aylanadi, yangisi narxni saqlaydi', () {
+    final old = Ingredient.fromJson({'name': 'Tovuq', 'amount': '120 g'});
+    expect(old.quantity, 120);
+    expect(old.unit, 'g');
+    expect(old.price, 0);
+    expect(old.amount, '120 g');
+    final piece = Ingredient.fromJson({'name': 'Non', 'amount': '1 dona'});
+    expect(piece.quantity, 0);
+    expect(piece.amount, '');
+
+    final next = Ingredient.fromJson({
+      'name': 'Tovuq',
+      'quantity': 0.2,
+      'unit': 'kg',
+      'price': 9000,
+    });
+    expect(next.unit, 'kg');
+    expect(next.price, 9000);
+    expect(next.amount, '0.20 kg');
+  });
+
   final from = DateTime(2026, 11, 1);
   final to = DateTime(2026, 11, 30);
 
@@ -75,6 +96,9 @@ void main() {
     expect(report.revenue, 64000);
     expect(report.expense, 36000);
     expect(report.profit, 28000);
+    expect(report.netProfit, 28000);
+    expect(report.soldQuantity, 2);
+    expect(report.toJson()['netProfit'], 28000);
     expect(report.profitPercent, 43.8);
     expect(report.salesCount, 1);
     expect(report.cancelledCount, 1);

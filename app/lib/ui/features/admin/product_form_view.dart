@@ -33,17 +33,35 @@ class ProductFormView extends StatefulWidget {
 }
 
 class _IngredientRow {
-  _IngredientRow({String name = '', String amount = ''})
-      : name = TextEditingController(text: name),
-        amount = TextEditingController(text: amount);
+  _IngredientRow({
+    String name = '',
+    String quantity = '',
+    this.unit = 'g',
+    String price = '',
+  })  : name = TextEditingController(text: name),
+        quantity = TextEditingController(text: quantity),
+        price = TextEditingController(text: price);
 
   final TextEditingController name;
-  final TextEditingController amount;
+  final TextEditingController quantity;
+  String unit;
+  final TextEditingController price;
 
   void dispose() {
     name.dispose();
-    amount.dispose();
+    quantity.dispose();
+    price.dispose();
   }
+}
+
+String _qtyText(double value) {
+  if (value <= 0) return '';
+  if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+  var text = value.toStringAsFixed(2);
+  while (text.endsWith('0') || text.endsWith('.')) {
+    text = text.substring(0, text.length - 1);
+  }
+  return text;
 }
 
 class _ProductFormViewState extends State<ProductFormView> {
@@ -66,6 +84,7 @@ class _ProductFormViewState extends State<ProductFormView> {
     super.initState();
     _cost.addListener(_refresh);
     _markup.addListener(_refresh);
+    _watch(_rows);
     _load();
   }
 
@@ -84,9 +103,51 @@ class _ProductFormViewState extends State<ProductFormView> {
     if (mounted) setState(() {});
   }
 
-  int get _costValue => int.tryParse(_cost.text) ?? 0;
+  int get _ingredientCost {
+    var sum = 0;
+    for (final row in _rows) {
+      sum += int.tryParse(row.price.text) ?? 0;
+    }
+    return sum;
+  }
+
+  int get _costValue => _ingredientCost > 0 ? _ingredientCost : (int.tryParse(_cost.text) ?? 0);
   int get _markupValue => int.tryParse(_markup.text) ?? 0;
   int get _price => _costValue + _markupValue;
+
+  void _watch(Iterable<_IngredientRow> rows) {
+    for (final row in rows) {
+      row.quantity.addListener(_refresh);
+      row.price.addListener(_refresh);
+    }
+  }
+
+  void _unwatch(_IngredientRow row) {
+    row.quantity.removeListener(_refresh);
+    row.price.removeListener(_refresh);
+  }
+
+  _IngredientRow _rowFrom(Ingredient item) {
+    return _IngredientRow(
+      name: item.name,
+      quantity: _qtyText(item.quantity),
+      unit: item.unit == 'kg' ? 'kg' : 'g',
+      price: item.price == 0 ? '' : '${item.price}',
+    );
+  }
+
+  void _removeRow(int index) {
+    final row = _rows.removeAt(index);
+    _unwatch(row);
+    setState(() {
+      if (_rows.isEmpty) {
+        final blank = _IngredientRow();
+        _watch([blank]);
+        _rows.add(blank);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => row.dispose());
+  }
 
   Future<void> _load() async {
     final repo = context.read<TezRepository>();
@@ -109,12 +170,15 @@ class _ProductFormViewState extends State<ProductFormView> {
           _markup.text = '${product.markup}';
           _existingImage = product.image;
           for (final row in _rows) {
+            _unwatch(row);
             row.dispose();
           }
+          final next = product.ingredients.map(_rowFrom).toList();
+          if (next.isEmpty) next.add(_IngredientRow());
+          _watch(next);
           _rows
             ..clear()
-            ..addAll(product.ingredients.map((item) => _IngredientRow(name: item.name, amount: item.amount)));
-          if (_rows.isEmpty) _rows.add(_IngredientRow());
+            ..addAll(next);
           _filled = true;
         }
         if (product == null && widget.productId != null) {
@@ -160,7 +224,12 @@ class _ProductFormViewState extends State<ProductFormView> {
     final ingredients = [
       for (final row in _rows)
         if (row.name.text.trim().isNotEmpty)
-          Ingredient(name: row.name.text.trim(), amount: row.amount.text.trim()),
+          Ingredient(
+            name: row.name.text.trim(),
+            quantity: double.tryParse(row.quantity.text.trim().replaceAll(',', '.')) ?? 0,
+            unit: row.unit == 'kg' ? 'kg' : 'g',
+            price: int.tryParse(row.price.text) ?? 0,
+          ),
     ];
     final keepImage = _photo == null && !_clearImage;
     try {
@@ -246,43 +315,21 @@ class _ProductFormViewState extends State<ProductFormView> {
                   TextField(controller: _name, decoration: const InputDecoration(hintText: 'Taom nomi')),
                   const SizedBox(height: 16),
                   const Text('Masalliqlar', style: TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Miqdor gramm yoki kilogrammda. Narx — shu miqdorning bitta taomdagi qiymati.',
+                    style: TextStyle(color: TezColors.muted),
+                  ),
                   const SizedBox(height: 8),
-                  for (var i = 0; i < _rows.length; i++) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: _rows[i].name,
-                            decoration: const InputDecoration(hintText: 'Masalliq'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: _rows[i].amount,
-                            decoration: const InputDecoration(hintText: 'Miqdor'),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            final row = _rows.removeAt(i);
-                            setState(() {
-                              if (_rows.isEmpty) _rows.add(_IngredientRow());
-                            });
-                            WidgetsBinding.instance.addPostFrameCallback((_) => row.dispose());
-                          },
-                          icon: const Icon(Icons.close),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                  ],
+                  for (var i = 0; i < _rows.length; i++) _ingredientCard(i),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
-                      onPressed: () => setState(() => _rows.add(_IngredientRow())),
+                      onPressed: () {
+                        final row = _IngredientRow();
+                        _watch([row]);
+                        setState(() => _rows.add(row));
+                      },
                       icon: const Icon(Icons.add),
                       label: const Text('Masalliq'),
                     ),
@@ -291,12 +338,17 @@ class _ProductFormViewState extends State<ProductFormView> {
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final stacked = constraints.maxWidth < 560;
-                      final cost = TextField(
-                        controller: _cost,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        decoration: const InputDecoration(labelText: 'Jami xarajat, so\'m'),
-                      );
+                      final cost = _ingredientCost > 0
+                          ? InputDecorator(
+                              decoration: const InputDecoration(labelText: 'Jami xarajat, so\'m'),
+                              child: Text(som(_ingredientCost), style: const TextStyle(fontWeight: FontWeight.w800)),
+                            )
+                          : TextField(
+                              controller: _cost,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              decoration: const InputDecoration(labelText: 'Jami xarajat, so\'m'),
+                            );
                       final markup = TextField(
                         controller: _markup,
                         keyboardType: TextInputType.number,
@@ -323,6 +375,10 @@ class _ProductFormViewState extends State<ProductFormView> {
                         const Text('Sotuv narxi', style: TextStyle(fontWeight: FontWeight.w700)),
                         Text(som(_price), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
                         Text(
+                          'Jami foyda ${som(_markupValue)}  ·  Jami sof foyda ${som(_markupValue)}',
+                          style: const TextStyle(color: TezColors.ink),
+                        ),
+                        Text(
                           'Foyda foizi ${percentText(_price == 0 ? 0 : (_markupValue * 1000 / _price).round() / 10)}',
                           style: const TextStyle(color: TezColors.ink),
                         ),
@@ -347,6 +403,68 @@ class _ProductFormViewState extends State<ProductFormView> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _ingredientCard(int index) {
+    final row = _rows[index];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 12),
+      decoration: BoxDecoration(
+        color: TezColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: TezColors.line),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: row.name,
+                  decoration: const InputDecoration(hintText: 'Masalliq'),
+                ),
+              ),
+              IconButton(onPressed: () => _removeRow(index), icon: const Icon(Icons.close)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: row.quantity,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                  decoration: const InputDecoration(hintText: 'Miqdor'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: const Text('g'),
+                selected: row.unit == 'g',
+                selectedColor: TezColors.yellow,
+                onSelected: (_) => setState(() => row.unit = 'g'),
+              ),
+              const SizedBox(width: 6),
+              ChoiceChip(
+                label: const Text('kg'),
+                selected: row.unit == 'kg',
+                selectedColor: TezColors.yellow,
+                onSelected: (_) => setState(() => row.unit = 'kg'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: row.price,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(hintText: 'Narxi, so\'m'),
+          ),
+        ],
+      ),
     );
   }
 

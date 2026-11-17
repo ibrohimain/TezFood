@@ -101,16 +101,20 @@ class Store {
       );
     }
 
+    Ingredient piece(String name, double quantity, int price, [String unit = 'g']) {
+      return Ingredient(name: name, quantity: quantity, unit: unit, price: price);
+    }
+
     products = [
       food(
         catalogId: catalogs[0].id,
         name: 'Tovuqli lavash',
         ingredients: [
-          Ingredient(name: 'Lavash xamiri', amount: '1 dona'),
-          Ingredient(name: 'Tovuq go\'shti', amount: '120 g'),
-          Ingredient(name: 'Pomidor', amount: '30 g'),
-          Ingredient(name: 'Bodring', amount: '30 g'),
-          Ingredient(name: 'Sous', amount: '20 g'),
+          piece('Lavash xamiri', 80, 3000),
+          piece('Tovuq go\'shti', 120, 9000),
+          piece('Pomidor', 30, 2000),
+          piece('Bodring', 30, 2000),
+          piece('Sous', 20, 2000),
         ],
         cost: 18000,
         markup: 14000,
@@ -119,11 +123,11 @@ class Store {
         catalogId: catalogs[0].id,
         name: 'Go\'shtli lavash',
         ingredients: [
-          Ingredient(name: 'Lavash xamiri', amount: '1 dona'),
-          Ingredient(name: 'Mol go\'shti', amount: '130 g'),
-          Ingredient(name: 'Piyoz', amount: '20 g'),
-          Ingredient(name: 'Pomidor', amount: '30 g'),
-          Ingredient(name: 'Sous', amount: '20 g'),
+          piece('Lavash xamiri', 80, 3000),
+          piece('Mol go\'shti', 130, 12000),
+          piece('Piyoz', 20, 1000),
+          piece('Pomidor', 30, 2000),
+          piece('Sous', 20, 4000),
         ],
         cost: 22000,
         markup: 16000,
@@ -132,11 +136,11 @@ class Store {
         catalogId: catalogs[1].id,
         name: 'Chizburger',
         ingredients: [
-          Ingredient(name: 'Burger noni', amount: '1 dona'),
-          Ingredient(name: 'Kotlet', amount: '100 g'),
-          Ingredient(name: 'Sir', amount: '20 g'),
-          Ingredient(name: 'Salat bargi', amount: '10 g'),
-          Ingredient(name: 'Sous', amount: '15 g'),
+          piece('Burger noni', 80, 3000),
+          piece('Kotlet', 100, 10000),
+          piece('Sir', 20, 4000),
+          piece('Salat bargi', 10, 1000),
+          piece('Sous', 15, 2000),
         ],
         cost: 20000,
         markup: 14000,
@@ -145,10 +149,10 @@ class Store {
         catalogId: catalogs[1].id,
         name: 'Tovuqli burger',
         ingredients: [
-          Ingredient(name: 'Burger noni', amount: '1 dona'),
-          Ingredient(name: 'Tovuq kotlet', amount: '110 g'),
-          Ingredient(name: 'Salat bargi', amount: '10 g'),
-          Ingredient(name: 'Sous', amount: '15 g'),
+          piece('Burger noni', 80, 3000),
+          piece('Tovuq kotlet', 110, 10000),
+          piece('Salat bargi', 10, 1000),
+          piece('Sous', 15, 3000),
         ],
         cost: 17000,
         markup: 13000,
@@ -157,10 +161,10 @@ class Store {
         catalogId: catalogs[2].id,
         name: 'Hot-dog',
         ingredients: [
-          Ingredient(name: 'Hot-dog noni', amount: '1 dona'),
-          Ingredient(name: 'Sosiska', amount: '1 dona'),
-          Ingredient(name: 'Ketchup', amount: '15 g'),
-          Ingredient(name: 'Xantal', amount: '5 g'),
+          piece('Hot-dog noni', 70, 2000),
+          piece('Sosiska', 80, 4000),
+          piece('Ketchup', 15, 1500),
+          piece('Xantal', 5, 500),
         ],
         cost: 8000,
         markup: 7000,
@@ -169,9 +173,9 @@ class Store {
         catalogId: catalogs[2].id,
         name: 'Kartoshka fri',
         ingredients: [
-          Ingredient(name: 'Kartoshka', amount: '150 g'),
-          Ingredient(name: 'Yog\'', amount: 'qovurish'),
-          Ingredient(name: 'Tuz', amount: '1 g'),
+          piece('Kartoshka', 150, 4000),
+          piece('Yog\'', 20, 1500),
+          piece('Tuz', 1, 500),
         ],
         cost: 6000,
         markup: 6000,
@@ -180,7 +184,7 @@ class Store {
         catalogId: catalogs[3].id,
         name: 'Cola 0.5',
         ingredients: [
-          Ingredient(name: 'Gazlangan ichimlik', amount: '0.5 l'),
+          piece('Gazlangan ichimlik', 500, 4000),
         ],
         cost: 4000,
         markup: 4000,
@@ -189,7 +193,7 @@ class Store {
         catalogId: catalogs[3].id,
         name: 'Mevali sok',
         ingredients: [
-          Ingredient(name: 'Sok', amount: '0.33 l'),
+          piece('Sok', 330, 5000),
         ],
         cost: 5000,
         markup: 4000,
@@ -431,6 +435,8 @@ class Store {
     required String channel,
     required String phone,
     required String address,
+    double? latitude,
+    double? longitude,
     required List<({int productId, int quantity})> lines,
   }) {
     return transaction(() async {
@@ -446,7 +452,7 @@ class Store {
             name: product.name,
             quantity: line.quantity,
             unitPrice: product.price,
-            unitCost: product.cost,
+            unitCost: product.countedCost,
           ),
         );
       }
@@ -459,6 +465,8 @@ class Store {
         channel: channel,
         phone: phone,
         address: address,
+        latitude: latitude,
+        longitude: longitude,
         items: items,
       );
       orders.add(order);
@@ -495,6 +503,8 @@ class Store {
         channel: current.channel,
         phone: current.phone,
         address: current.address,
+        latitude: current.latitude,
+        longitude: current.longitude,
         items: current.items,
       );
       orders[index] = next;

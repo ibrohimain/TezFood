@@ -17,6 +17,8 @@ class ProductSales {
 
   int get profit => revenue - expense;
 
+  int get netProfit => profit;
+
   double get profitPercent =>
       revenue == 0 ? 0 : (profit * 1000 / revenue).round() / 10;
 
@@ -27,6 +29,7 @@ class ProductSales {
         'revenue': revenue,
         'expense': expense,
         'profit': profit,
+        'netProfit': netProfit,
         'profitPercent': profitPercent,
       };
 }
@@ -50,16 +53,22 @@ class SalesReport {
 
   int get profit => revenue - expense;
 
+  int get netProfit => profit;
+
+  int get soldQuantity => products.fold(0, (sum, item) => sum + item.quantity);
+
   double get profitPercent =>
       revenue == 0 ? 0 : (profit * 1000 / revenue).round() / 10;
 
   Map<String, dynamic> toJson() => {
         'salesCount': salesCount,
+        'soldQuantity': soldQuantity,
         'openCount': openCount,
         'cancelledCount': cancelledCount,
         'revenue': revenue,
         'expense': expense,
         'profit': profit,
+        'netProfit': netProfit,
         'profitPercent': profitPercent,
         'products': products.map((e) => e.toJson()).toList(),
       };

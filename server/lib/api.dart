@@ -112,6 +112,9 @@ class Api {
       return _error(400, 'Summa juda katta');
     }
     final ingredients = _ingredients(body['ingredients']);
+    final priced = ingredients.fold<int>(0, (sum, item) => sum + item.price);
+    final storedCost = priced > 0 ? priced : cost;
+    if (storedCost > 100000000) return _error(400, 'Summa juda katta');
     String? image;
     var keepImage = true;
     if (body.containsKey('imageBase64')) {
@@ -126,7 +129,7 @@ class Api {
       catalogId: catalogId,
       name: name,
       ingredients: ingredients,
-      cost: cost,
+      cost: storedCost,
       markup: markup,
       image: image,
       keepImage: keepImage && id != null,
@@ -166,10 +169,17 @@ class Api {
     }
     final phone = (body['phone'] as String? ?? '').trim();
     final address = (body['address'] as String? ?? '').trim();
+    double? latitude;
+    double? longitude;
     if (channel == 'yetkazish') {
       final digits = phone.replaceAll(RegExp(r'\D'), '');
       if (digits.length < 9) return _error(400, 'Yetkazish uchun telefon kiriting');
       if (address.length < 5) return _error(400, 'Yetkazish manzilini kiriting');
+      latitude = _coord(body['latitude'], min: -90, max: 90, label: 'Kenglik');
+      longitude = _coord(body['longitude'], min: -180, max: 180, label: 'Uzunlik');
+      if ((latitude == null) != (longitude == null)) {
+        return _error(400, 'Joylashuv noto\'g\'ri');
+      }
     }
     final rawLines = body['items'];
     if (rawLines is! List || rawLines.isEmpty) {
@@ -190,6 +200,8 @@ class Api {
       channel: channel,
       phone: phone,
       address: address,
+      latitude: latitude,
+      longitude: longitude,
       lines: lines,
     );
     return _json(order.toJson(), status: 201);
@@ -279,6 +291,15 @@ class Api {
     throw StoreException('$label raqam bo\'lsin');
   }
 
+  double? _coord(Object? value, {required double min, required double max, required String label}) {
+    if (value == null) return null;
+    final number = value is num ? value.toDouble() : double.tryParse('$value');
+    if (number == null || number < min || number > max) {
+      throw StoreException('$label noto\'g\'ri');
+    }
+    return number;
+  }
+
   List<Ingredient> _ingredients(Object? raw) {
     if (raw == null) return [];
     if (raw is! List) throw StoreException('Masalliqlar ro\'yxati noto\'g\'ri');
@@ -287,9 +308,17 @@ class Api {
     for (final entry in raw) {
       if (entry is! Map) throw StoreException('Masalliq noto\'g\'ri');
       final name = (entry['name'] as String? ?? '').trim();
-      final amount = (entry['amount'] as String? ?? '').trim();
       if (name.isEmpty) continue;
-      items.add(Ingredient(name: name, amount: amount));
+      final price = entry['price'] == null ? 0 : _money(entry['price'], label: 'Masalliq narxi');
+      final measured = measureOf(
+        amount: (entry['amount'] as String? ?? '').trim(),
+        quantity: entry['quantity'],
+        unit: entry['unit'] as String?,
+      );
+      if (measured.$1 < 0 || measured.$1 > 100000) {
+        throw StoreException('Miqdor noto\'g\'ri');
+      }
+      items.add(Ingredient(name: name, quantity: measured.$1, unit: measured.$2, price: price));
     }
     return items;
   }

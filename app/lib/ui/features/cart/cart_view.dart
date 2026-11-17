@@ -18,6 +18,13 @@ class CartView extends StatefulWidget {
 }
 
 class _CartViewState extends State<CartView> {
+  Future<void> _locate() async {
+    await widget.model.locate();
+    if (!mounted) return;
+    final hint = widget.model.addressHint;
+    if (hint.isNotEmpty) _address.text = hint;
+  }
+
   final _phone = TextEditingController();
   final _address = TextEditingController();
 
@@ -127,7 +134,11 @@ class _CartViewState extends State<CartView> {
                 label: Text(item.$2),
                 selected: model.channel == item.$1,
                 selectedColor: TezColors.yellow,
-                onSelected: (_) => model.setChannel(item.$1),
+                onSelected: (selected) {
+                  if (!selected) return;
+                  model.setChannel(item.$1);
+                  if (item.$1 == 'yetkazish') _locate();
+                },
               ),
           ],
         ),
@@ -141,8 +152,26 @@ class _CartViewState extends State<CartView> {
           const SizedBox(height: 10),
           TextField(
             controller: _address,
+            minLines: 2,
+            maxLines: 3,
             decoration: const InputDecoration(hintText: 'Manzil'),
           ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: model.locating ? null : _locate,
+              icon: model.locating
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.my_location),
+              label: Text(model.locating ? 'Joylashuv aniqlanmoqda' : 'Joylashuvni aniqlash'),
+            ),
+          ),
+          if (model.latitude != null)
+            const Text(
+              'Nuqta saqlandi. Kassa buyurtmani qabul qilganda shu yerga yo\'l ochiladi.',
+              style: TextStyle(color: TezColors.muted),
+            ),
         ],
         const SizedBox(height: 16),
         Container(

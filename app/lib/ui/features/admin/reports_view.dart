@@ -93,19 +93,19 @@ class ReportsView extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
-              childAspectRatio: wide ? 1.45 : 1.25,
+              childAspectRatio: wide ? 1.2 : 1.05,
               children: [
                 MoneyTile(label: 'Tushum', value: som(report.revenue), color: TezColors.yellowDeep),
-                MoneyTile(label: 'Xarajat', value: som(report.expense), color: TezColors.pink),
-                MoneyTile(label: 'Foyda', value: som(report.profit), color: TezColors.green),
-                MoneyTile(label: 'Foyda foizi', value: percentText(report.profitPercent), color: TezColors.ink),
+                MoneyTile(label: 'Jami xarajat', value: som(report.expense), color: TezColors.pink),
+                MoneyTile(label: 'Jami foyda', value: som(report.profit), color: TezColors.green),
+                MoneyTile(label: 'Jami sof foyda', value: som(report.netProfit), color: TezColors.ink),
               ],
             );
           },
         ),
         const SizedBox(height: 10),
         Text(
-          'Buyurtma: ${report.salesCount}   ·   Hali berilmagan: ${report.openCount}   ·   Bekor: ${report.cancelledCount}',
+          'Taom ${report.soldQuantity} ta sotildi  ·  Buyurtma ${report.salesCount} ta  ·  Sof foyda foizi ${percentText(report.profitPercent)}\nJami sof foyda = tushum − masalliq xarajati. Hali berilmagan ${report.openCount} ta, bekor ${report.cancelledCount} ta.',
           style: const TextStyle(color: TezColors.muted),
         ),
         const SizedBox(height: 18),
@@ -140,7 +140,7 @@ class ReportsView extends StatelessWidget {
           Row(
             children: [
               Expanded(child: Text(product.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
-              Text('${product.quantity} ta', style: const TextStyle(fontWeight: FontWeight.w900, color: TezColors.pink)),
+              Text('${product.quantity} ta sotildi', style: const TextStyle(fontWeight: FontWeight.w900, color: TezColors.pink)),
             ],
           ),
           const SizedBox(height: 10),
@@ -149,8 +149,9 @@ class ReportsView extends StatelessWidget {
             runSpacing: 8,
             children: [
               _stat('Tushum', som(product.revenue)),
-              _stat('Xarajat', som(product.expense)),
-              _stat('Foyda', som(product.profit)),
+              _stat('Jami xarajat', som(product.expense)),
+              _stat('Jami foyda', som(product.profit)),
+              _stat('Jami sof foyda', som(product.netProfit)),
               _stat('Foiz', percentText(product.profitPercent)),
             ],
           ),

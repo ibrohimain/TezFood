@@ -62,12 +62,16 @@ class TezRepository {
     required String channel,
     required String phone,
     required String address,
+    double? latitude,
+    double? longitude,
     required List<({int productId, int quantity})> items,
   }) async {
     final data = await _api.post('/api/orders', body: {
       'channel': channel,
       'phone': phone,
       'address': address,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
       'items': [
         for (final item in items) {'productId': item.productId, 'quantity': item.quantity},
       ],

@@ -5,9 +5,20 @@ import 'package:provider/provider.dart';
 import '../../../data/repositories/tez_repository.dart';
 import '../../../domain/models.dart';
 import '../../core/format.dart';
+import '../../core/open_link.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'kassa_view_model.dart';
+
+String navigatorUrl(ShopOrder order) {
+  final lat = order.latitude;
+  final lng = order.longitude;
+  if (lat != null && lng != null) {
+    return 'https://yandex.uz/maps/?rtext=~$lat,$lng&rtt=auto';
+  }
+  final query = order.address.trim().isEmpty ? 'Toshkent' : order.address.trim();
+  return 'https://yandex.uz/maps/?text=${Uri.encodeComponent(query)}';
+}
 
 class KassaView extends StatelessWidget {
   const KassaView({super.key, required this.model, this.embedded = false});
@@ -82,7 +93,7 @@ class KassaView extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
           gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
             maxCrossAxisExtent: wide ? 420 : 700,
-            mainAxisExtent: 280,
+            mainAxisExtent: 360,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
           ),
@@ -155,6 +166,17 @@ class _OrderCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          if (order.channel == 'yetkazish' && order.status != 'cancelled') ...[
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => openLink(navigatorUrl(order)),
+                icon: const Icon(Icons.navigation_outlined),
+                label: const Text('Qabul qilish · Yo\'l'),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           if (order.status == 'new')
             Row(
               children: [
