@@ -1,19 +1,64 @@
 class Ingredient {
-  const Ingredient({required this.name, required this.amount});
+  const Ingredient({
+    required this.name,
+    required this.quantity,
+    required this.unit,
+    required this.price,
+  });
 
   final String name;
-  final String amount;
+  final double quantity;
+  final String unit;
+  final int price;
+
+  String get amount {
+    if (quantity <= 0) return '';
+    final text = quantity == quantity.roundToDouble()
+        ? quantity.toStringAsFixed(0)
+        : quantity.toStringAsFixed(2);
+    return '$text $unit';
+  }
 
   String get label => amount.isEmpty ? name : '$name · $amount';
 
   factory Ingredient.fromJson(Map<String, dynamic> json) {
+    final measured = _measureOf(
+      amount: json['amount'] as String? ?? '',
+      quantity: json['quantity'],
+      unit: json['unit'] as String?,
+    );
     return Ingredient(
       name: json['name'] as String? ?? '',
-      amount: json['amount'] as String? ?? '',
+      quantity: measured.$1,
+      unit: measured.$2,
+      price: _asInt(json['price']),
     );
   }
 
-  Map<String, dynamic> toJson() => {'name': name, 'amount': amount};
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'quantity': quantity,
+        'unit': unit,
+        'price': price,
+        'amount': amount,
+      };
+}
+
+(double, String) _measureOf({required String amount, Object? quantity, String? unit}) {
+  if (quantity is num) {
+    return (quantity.toDouble(), unit == 'kg' ? 'kg' : 'g');
+  }
+  if (quantity is String) {
+    final parsed = double.tryParse(quantity.trim().replaceAll(',', '.'));
+    if (parsed != null) return (parsed, unit == 'kg' ? 'kg' : 'g');
+  }
+  final lower = amount.toLowerCase();
+  final hasKg = RegExp(r'(^|[^a-z])kg\b').hasMatch(lower);
+  final hasGram = RegExp(r'(^|[^a-z])g\b').hasMatch(lower);
+  if (!hasKg && !hasGram) return (0, 'g');
+  final match = RegExp(r'(\d+(?:[.,]\d+)?)').firstMatch(amount);
+  final value = match == null ? 0.0 : double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
+  return (value, hasKg ? 'kg' : 'g');
 }
 
 class Catalog {
@@ -136,6 +181,8 @@ class ShopOrder {
     required this.channel,
     required this.phone,
     required this.address,
+    this.latitude,
+    this.longitude,
     required this.items,
   });
 
@@ -146,6 +193,8 @@ class ShopOrder {
   final String channel;
   final String phone;
   final String address;
+  final double? latitude;
+  final double? longitude;
   final List<OrderLine> items;
 
   int get total => items.fold(0, (sum, line) => sum + (line.unitPrice ?? 0) * line.quantity);
@@ -160,6 +209,8 @@ class ShopOrder {
       channel: json['channel'] as String? ?? 'zal',
       phone: json['phone'] as String? ?? '',
       address: json['address'] as String? ?? '',
+      latitude: _asDouble(json['latitude']),
+      longitude: _asDouble(json['longitude']),
       items: raw
           .whereType<Map>()
           .map((e) => OrderLine.fromJson(Map<String, dynamic>.from(e)))
@@ -186,6 +237,8 @@ class ProductSales {
   final int expense;
   final int profit;
   final double profitPercent;
+
+  int get netProfit => profit;
 
   factory ProductSales.fromJson(Map<String, dynamic> json) {
     return ProductSales(
@@ -225,6 +278,10 @@ class SalesReport {
   final double profitPercent;
   final List<ProductSales> products;
 
+  int get netProfit => profit;
+
+  int get soldQuantity => products.fold(0, (sum, item) => sum + item.quantity);
+
   factory SalesReport.fromJson(Map<String, dynamic> json) {
     final raw = json['products'] as List<dynamic>? ?? [];
     return SalesReport(
@@ -249,4 +306,10 @@ int _asInt(Object? value) {
   if (value is int) return value;
   if (value is num) return value.round();
   return int.tryParse('$value') ?? 0;
+}
+
+double? _asDouble(Object? value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse('$value');
 }
