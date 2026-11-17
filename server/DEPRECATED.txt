@@ -1,0 +1,3 @@
+Bu papka eski Dart (Shelf) backend.
+Hozirgi asosiy backend: ../backend (Python / FastAPI).
+Ishga tushirish: ildizdagi ishga-tushir.ps1
